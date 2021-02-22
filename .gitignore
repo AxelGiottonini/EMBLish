@@ -1,4 +1,4 @@
-files/*
-out/*
-temp/*
+files
+out
+temp
 *.txt

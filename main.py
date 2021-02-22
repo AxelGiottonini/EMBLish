@@ -10,7 +10,34 @@ import re
 import subprocess
 import sys
 
+"""
+The FASTA entries are created by the fastaIterator from fasta files.
 
+Fasta entries are written as two lines handles with the sequence's id and the 
+sequence what can be represented as follow
+# >SEQ00001
+# ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG...
+"""
+class FASTA_ENTRY():
+    def __init__(self, id, seq):
+        self.id = id
+        self.seq = seq
+
+"""
+GFF entries are created by the gffIterator from gff files.
+
+GFF entries are written as one line handles where fields are delimited by
+tabulations as follow
+# ptg001366l	.	contig	1	28502	.	.	.	ID=ptg01366l;Name=ptg01366l
+      <0>      <1>   <2>   <3>   <4>   <5> <6> <7>              <8>
+
+We select the required fields for the EMBL conversion, which are: 0, 2, 3, 4, 
+5, 6, 8. The start position (field 3) is altered so that biopython don't ignore
+the first position and the strand is converted in the +1/-1 format.
+
+The exonId method allow to create an unique id for the exons which is required
+for the EMBL conversion.
+"""
 class GFF_ENTRY():
     def __init__(self, entry):
         parsed = re.split(r"\t", entry)
@@ -25,9 +52,19 @@ class GFF_ENTRY():
         assert (self.type == "exon"), "Exon entry required"
         return ("exon_id=" + self.seqid + "-E:" + re.split(r":", re.split(r";", self.attributes)[0])[2])
 
-    def length(self):
-        return self.end - self.start
+"""
+Annotation entries are created by the annotation itterator.
 
+Annotation entries are written as one line handles where fields are delimited by 
+tabulations as follow
+# gene	EC_ARGOT	14.44	0.847	EC:4.2.1.134 	GO:0102345
+  <0>   <1>         <2>     <3>     <4>             <5>   
+
+We select the required fields for the EMBL conversion, which are 0, 1,4 and 5.
+
+The keggId method allow the conversion of the various values values in EC_ARGOT
+entry into one more relevant entry.
+"""
 class ANNOTATION_ENTRY():
     def __init__(self, entry):
         parsed = re.split(r"\t", entry)
@@ -41,256 +78,255 @@ class ANNOTATION_ENTRY():
         for id in re.split(r" ", self.id):
             if id and re.search("^EC:\d+\.\d+\.\d+\.\d+$", id): (yield "KEGG_Enzyme:" + id[3:])
 
+"""
+The four following generators are responsible to read and convert file entries
+into their object type.
+"""
+def lineIterator(lineFile):
+    assert os.path.isfile(lineFile)
+    with open(lineFile, "r") as file:
+        lines = (line.rsplit("\n")[0] for line in file.readlines())
+        try:
+            while True:
+                (yield next(lines))
+        except StopIteration:
+            pass
+        finally:
+            file.close()
+
+def fastaIterator(fastaFile):
+    assert os.path.isfile(fastaFile)
+    with open(fastaFile, "r") as file:
+        lines = (line.rsplit("\n")[0] for line in file.readlines())
+        try:
+            while True:
+                (yield FASTA_ENTRY(next(lines)[1:], next(lines)))
+        except StopIteration:
+            pass
+        finally:
+            file.close()
+
+def gffIterator(gffFile):
+    assert os.path.isfile(gffFile)
+    with open(gffFile, "r") as file:
+        lines = (line.rsplit("\n")[0] for line in file.readlines())
+        try:
+            while True:
+                (yield GFF_ENTRY(next(lines)))
+        except StopIteration:
+            pass
+        finally:
+            file.close()
+
+def annotationIterator(annotationFile):
+    assert os.path.isfile(annotationFile)
+    with open(annotationFile, "r") as file:
+        lines = (line.rsplit("\n")[0] for line in file.readlines())
+        try:
+            while True:
+                (yield ANNOTATION_ENTRY(next(lines)))
+        except StopIteration:
+            pass
+        finally:
+            file.close()
+
+# Defining a "partial" method for subprocess.call
 def cmd(_cmd_):
     subprocess.call(_cmd_, shell=True)
 
+# Command responsible for the merging of Feature locations
 def mergeLocations(_locationArray_):
     assert (len(_locationArray_) != 0), "Empty location array" 
     return _locationArray_[0] if len(_locationArray_) == 1 else CompoundLocation(_locationArray_)
 
-def main(fastaFile, annoFile, gffFile, projectFile):
-    """Script files & folder assignment and initialisation. The files have to be specified in 
-    the function call, and the already existing temp & out folder will be removed with their 
-    whole content."""
-    SEQUENCES_FILE = fastaFile
-    ANNOTATIONS_FILE = annoFile
-    GFF_FILE = gffFile 
-    PROJECT_FILE = projectFile   
+
+def main(projectFile, fastaFile, gffFile, annotationFile):
+
+    # Path to temp and output folder
     TEMP_FOLDER = "temp/"
     OUT_FOLDER = "out/"
+
+    # Removing old temp & out folder if they already exists
     if os.path.isdir(TEMP_FOLDER): cmd("rm -r " + TEMP_FOLDER)
     if os.path.isdir(OUT_FOLDER): cmd("rm -r " + OUT_FOLDER)
+
+    # Creating temp & out folder
     cmd("mkdir " + TEMP_FOLDER)
     cmd("mkdir " + OUT_FOLDER)
-    assert os.path.isfile(SEQUENCES_FILE), "FASTA file not found!"
-    assert os.path.isfile(ANNOTATIONS_FILE), "Annotations file not found!"
-    assert os.path.isfile(GFF_FILE), "GFF file not found!"
-    assert os.path.isfile(projectFile), "Project file not found!"
+
+    # Path to submited files
+    PROJECT_FILE = projectFile
+    FASTA_FILE = fastaFile
+    GFF_FILE = gffFile
+    ANNOTATION_FILE = annotationFile
+
+    # Verifying that folder are created and files exists
     assert os.path.isdir(TEMP_FOLDER), "Could not create temp folder!"
     assert os.path.isdir(OUT_FOLDER), "Could not create out folder!"
+    assert os.path.isfile(FASTA_FILE), "FASTA file not found!"
+    assert os.path.isfile(ANNOTATION_FILE), "Annotations file not found!"
+    assert os.path.isfile(GFF_FILE), "GFF file not found!"
+    assert os.path.isfile(projectFile), "Project file not found!"
 
-    """Reading of the project file and definition of the shared variables"""
-    __PROJECT__ = None
-    #__DATA_CLASS__ = None
-    __DIVISION__ = None
-    __ORGANISM__ = None
-    __TAXONOMY__ = None
-    __MOLECULE_TYPE__ = None
-    __TOPOLOGY__ = None
+    # Project variables initialization
     __DESCRIPTION__ = None
-    with open(PROJECT_FILE, "r") as project:
-        project_lines = (line.rstrip("\n") for line in project.readlines())
-        try:
-            while True:
-                parsed = re.split(r":", next(project_lines))
-                if parsed[0] == "PROJECT": __PROJECT__ = parsed[1]
-                elif parsed[0] == "DIVISION": __DIVISION__ = parsed[1]
-                elif parsed[0] == "TAXONOMY": __TAXONOMY__ = re.split(r"-",parsed[1])
-                elif parsed[0] == "ORGANISM": __ORGANISM__ = parsed[1]
-                elif parsed[0] == "MOLECULE_TYPE": __MOLECULE_TYPE__ = parsed[1]
-                elif parsed[0] == "TOPOLOGY": __TOPOLOGY__ = parsed[1]
-                elif parsed[0] == "DESCRIPTION": __DESCRIPTION__ = parsed[1]
-        except StopIteration:
-            pass
-        finally:
-            project.close()
-    assert __PROJECT__, "Project undefined"
-    assert __DIVISION__, "Division undefined"
-    assert __ORGANISM__, "Organism undefined"
-    assert __TAXONOMY__ , "Taxonomy undefined"
-    assert __MOLECULE_TYPE__, "Molecule type undefined"
-    assert __TOPOLOGY__, "Topology undefined"
-    assert __DESCRIPTION__, "Description undefined"
+    __DIVISION__ = None
+    __MOLECULE_TYPE__ = None
+    __ORGANISM__ = None
+    __PROJECT__ = None
+    __TAXONOMY__ = None
+    __TOPOLOGY__ = None
 
-    """Creation of the contig file containing a list of all the sequences information, 
-    complementary to the fasta file"""
+    for project_entry in (lineIterator(PROJECT_FILE)):
+        parsed = re.split(r":", project_entry)
+        if parsed[0] == "DESCRIPTION": __DESCRIPTION__ = parsed[1]
+        elif parsed[0] == "DIVISION": __DIVISION__ = parsed[1]
+        elif parsed[0] == "MOLECULE_TYPE": __MOLECULE_TYPE__ = parsed[1]
+        elif parsed[0] == "ORGANISM": __ORGANISM__ = parsed[1]
+        elif parsed[0] == "PROJECT": __PROJECT__ = parsed[1]
+        elif parsed[0] == "TAXONOMY": __TAXONOMY__ = re.split(r"-",parsed[1])
+        elif parsed[0] == "TOPOLOGY": __TOPOLOGY__ = parsed[1]
+
+    # Verifying that the project variables are all defined
+    assert __DESCRIPTION__, "Description undefined"
+    assert __DIVISION__, "Division undefined"
+    assert __MOLECULE_TYPE__, "Molecule type undefined"
+    assert __ORGANISM__, "Organism undefined"
+    assert __PROJECT__, "Project undefined"
+    assert __TAXONOMY__ , "Taxonomy undefined"
+    assert __TOPOLOGY__, "Topology undefined"
+
+    # Contig file creation (the data contained in this file is complementary
+    # to the data in the fasta file)
     CONTIG_FILE = TEMP_FOLDER + "contig.gff"
     cmd("grep \"contig\" " + GFF_FILE + " > " + CONTIG_FILE)
     assert os.path.isfile(CONTIG_FILE)
 
-    """Line by line reading of the fasta file containing the sequence informations of the
-    contigs. We should note that the sequence id has to be found in the annotations and gff
-    files."""
-    with open(SEQUENCES_FILE, "r") as sequences:
-        sequences_lines = (line.rstrip("\n") for line in sequences.readlines())
-        
-        while True:
-            try:
-                sequence_id = next(sequences_lines)[1:]
-                sequence = next(sequences_lines)
+    # Iteration through the sequences from the fasta file
+    for fasta_entry in fastaIterator(FASTA_FILE):
 
-                """Creation of the files and folder required for the sequence merging and
-                initialization of the record to which we already append the source feature"""
-                SEQUENCE_FOLDER = TEMP_FOLDER + sequence_id + "/"
-                SEQUENCE_ANNOTATIONS_FILE = SEQUENCE_FOLDER + "anno.out"
-                SUB_SEQUENCES_FILE = SEQUENCE_FOLDER + "subseq.out"
-                SEQUENCE_EXONS_FILE = SEQUENCE_FOLDER + "exons.gff"
-                OUTPUT_FILE = OUT_FOLDER + sequence_id + ".dat"
-                cmd("mkdir " + SEQUENCE_FOLDER)
-                cmd("grep \"" + sequence_id + "\" " + ANNOTATIONS_FILE + " > " + SEQUENCE_ANNOTATIONS_FILE)
-                cmd("grep \"original_DE\" " + SEQUENCE_ANNOTATIONS_FILE + " | cut -f1 > " + SUB_SEQUENCES_FILE)
-                cmd("grep \"" + sequence_id + "\" " + GFF_FILE + " | grep \":exon:\" > " + SEQUENCE_EXONS_FILE)
-                cmd("touch " + OUTPUT_FILE)
-                assert os.path.isdir(SEQUENCE_FOLDER), "Could not create sequence folder!"
-                assert os.path.isfile(SEQUENCE_ANNOTATIONS_FILE), "Could not create sequence annotation file!"
-                assert os.path.isfile(SUB_SEQUENCES_FILE), "Could not create sub sequences file!"
-                assert os.path.isfile(SEQUENCE_EXONS_FILE)
-                assert os.path.isfile(OUTPUT_FILE)
+        # Subfiles and subfolder creation
+        SEQUENCE_FOLDER = TEMP_FOLDER + fasta_entry.id + "/"
+        cmd("mkdir " + SEQUENCE_FOLDER)
+        assert os.path.isdir(SEQUENCE_FOLDER)
 
-                _record_ = SeqRecord(Seq(sequence), id=sequence_id)
-                _record_.dbxrefs = ["Project:"+__PROJECT__]
-                _record_.annotations = {
-                    "molecule_type":__MOLECULE_TYPE__, 
-                    "topology":__TOPOLOGY__, 
-                    "data_file_division":__DIVISION__, 
-                    "taxonomy":__TAXONOMY__, 
-                    "organism":__ORGANISM__}
-                _record_.description = __DESCRIPTION__
+        SEQUENCE_GFF_FILE = SEQUENCE_FOLDER + "data.gff"
+        SEQUENCE_EXON_FILE = SEQUENCE_FOLDER + "exons.gff"
+        SEQUENCE_ANNOTATION_FILE = SEQUENCE_FOLDER + "anno.out"
+        SEQUENCE_SUBSEQUENCE_FILE = SEQUENCE_FOLDER + "subseq.out"
 
-                source_entry = GFF_ENTRY(subprocess.check_output("grep \"" + sequence_id + "\" " + CONTIG_FILE, shell=True).decode("utf-8"))
-                _source_ = SeqFeature(FeatureLocation(source_entry.start, source_entry.end, strand=source_entry.strand), type="source")
-                _source_QUALIFIERS = {"organism":[__ORGANISM__], "mol_type":[__MOLECULE_TYPE__], "db_xref":list()}
-                _source_.qualifiers = _source_QUALIFIERS
-                _record_.features.append(_source_)
+        cmd("grep " + fasta_entry.id + " " + GFF_FILE + " > " + SEQUENCE_GFF_FILE)
+        cmd("grep " + fasta_entry.id + " " + GFF_FILE + " | grep \":exon:\" > " + SEQUENCE_EXON_FILE)
+        cmd("grep " + fasta_entry.id + " " + ANNOTATION_FILE + " > " + SEQUENCE_ANNOTATION_FILE)
+        cmd("grep " + fasta_entry.id + " " + ANNOTATION_FILE + " | grep \"original_DE\" | cut -f1 > " + SEQUENCE_SUBSEQUENCE_FILE)
 
-                """Line by line reading of the subsequence ids file, which contain the ids shared between the annotation
-                and the gff file."""
-                with open(SUB_SEQUENCES_FILE, "r") as sub_sequences:
-                    sub_sequences_lines = (line.rstrip("\n") for line in sub_sequences.readlines())
-                    try:
-                        while True:
-                            sub_sequence_id = next(sub_sequences_lines)
+        # Assertion of the creation of the files
+        assert os.path.isfile(SEQUENCE_GFF_FILE)
+        assert os.path.isfile(SEQUENCE_EXON_FILE)
+        assert os.path.isfile(SEQUENCE_ANNOTATION_FILE)
+        assert os.path.isfile(SEQUENCE_SUBSEQUENCE_FILE)
 
-                            """Initialization of the minimized files for the features creation for each subsequence & features
-                            initialization"""
-                            SUB_SEQUENCE_FOLDER = SEQUENCE_FOLDER + sub_sequence_id + "/"
-                            SUB_SEQUENCE_ANNOTATIONS_FILE = SUB_SEQUENCE_FOLDER + "anno.out"
-                            SUB_SEQUENCE_GFF_FILE = SUB_SEQUENCE_FOLDER + "data.gff"
-                            cmd("mkdir " + SUB_SEQUENCE_FOLDER)
-                            cmd("grep \"" + sub_sequence_id + "\" " + SEQUENCE_ANNOTATIONS_FILE + " > " + SUB_SEQUENCE_ANNOTATIONS_FILE)
-                            cmd("grep \"" + sub_sequence_id + "\" " + GFF_FILE + " > " + SUB_SEQUENCE_GFF_FILE)
-                            assert os.path.isdir(SUB_SEQUENCE_FOLDER), "Could not create sub sequence folder!"
-                            assert os.path.isfile(SUB_SEQUENCE_ANNOTATIONS_FILE), "Could not create sub sequence annotations file!"
-                            assert os.path.isfile(SUB_SEQUENCE_GFF_FILE), "Could not create sub sequence gff file!"
+        # Creation of the record output file
+        OUTPUT_FILE = OUT_FOLDER + fasta_entry.id + ".dat"
+        cmd("touch " + OUTPUT_FILE)
+        assert os.path.isfile(OUTPUT_FILE)
 
-                            _gene_LOCATION = None
-                            _gene_QUALIFIERS = {"gene":list(), "note":list()}
-                            _mRNA_LOCATION = list()
-                            _mRNA_QUALIFIERS = {"gene":list(), "standard_name":list()}
-                            _CDS_LOCATION = list()
-                            _CDS_QUALIFIERS = {"gene":list(), "protein_id":list(), "product":list(), "note":list(), "db_xref":list(), "translation":list()}
-                            _3_UTR_LOCATION = None
-                            _5_UTR_LOCATION = None
+        # Record creation
+        _record_ = SeqRecord(
+            Seq(fasta_entry.seq), 
+            id=fasta_entry.id, 
+            dbxrefs=["Project:" + __PROJECT__],
+            annotations={
+                "data_file_division":__DIVISION__, 
+                "molecule_type":__MOLECULE_TYPE__, 
+                "organism":__ORGANISM__, 
+                "taxonomy":__TAXONOMY__,
+                "topology":__TOPOLOGY__},
+            description=__DESCRIPTION__)
 
-                            """Features location creation with the gff file & Features qualifiers creation with the annotation file"""
-                            with open(SUB_SEQUENCE_GFF_FILE, "r") as sub_sequence_gff:
-                                sub_sequence_gff_lines = (line.rstrip("\n") for line in sub_sequence_gff.readlines())
-                                try:
-                                    while True:
-                                        gff_entry = GFF_ENTRY(next(sub_sequence_gff_lines))
+        # Source feature creation
+        source_entry = GFF_ENTRY(subprocess.check_output("grep \"" + fasta_entry.id + "\" " + CONTIG_FILE, shell=True).decode("utf-8"))
+        _source_ = SeqFeature(
+            FeatureLocation(source_entry.start, source_entry.end, strand=source_entry.strand),
+            type="source",
+            qualifiers={
+                "organism":__ORGANISM__,
+                "mol_type":__MOLECULE_TYPE__,
+                "db_xref":list()
+            })
+        _record_.features.append(_source_)
 
-                                        if gff_entry.type == "mRNA": _gene_LOCATION = FeatureLocation(gff_entry.start, gff_entry.end, strand=gff_entry.strand)
-                                        elif gff_entry.type == "exon": _mRNA_LOCATION.append(FeatureLocation(gff_entry.start, gff_entry.end, strand=gff_entry.strand))
-                                        elif gff_entry.type == "CDS":  _CDS_LOCATION.append(FeatureLocation(gff_entry.start, gff_entry.end, strand=gff_entry.strand))
-                                        elif gff_entry.type == "three_prime_UTR": _3_UTR_LOCATION = FeatureLocation(gff_entry.start, gff_entry.end, strand=gff_entry.strand)
-                                        elif gff_entry.type == "five_prime_UTR":  _5_UTR_LOCATION = FeatureLocation(gff_entry.start, gff_entry.end, strand=gff_entry.strand)
-                                except StopIteration:
-                                    pass
-                                finally:
-                                    sub_sequence_gff.close()
+        for sub_sequence_id in lineIterator(SEQUENCE_SUBSEQUENCE_FILE):
+            
+            # Subfiles and subfolder creation
+            SUBSEQUENCE_FOLDER = SEQUENCE_FOLDER + sub_sequence_id + "/"
+            cmd("mkdir " + SUBSEQUENCE_FOLDER)
+            assert os.path.isdir(SUBSEQUENCE_FOLDER)
 
-                            with open(SUB_SEQUENCE_ANNOTATIONS_FILE, "r") as sub_sequence_annotations:
-                                sub_sequence_annotations_lines = (line.rstrip("\n") for line in sub_sequence_annotations.readlines())
-                                try:
-                                    while True:
-                                        annotation_entry = ANNOTATION_ENTRY(next(sub_sequence_annotations_lines))
+            SUBSEQUENCE_GFF_FILE = SUBSEQUENCE_FOLDER + "data.gff"
+            SUBSEQUENCE_ANNOTATION_FILE = SUBSEQUENCE_FOLDER + "anno.out"
 
-                                        if annotation_entry.type == "qseq":  _CDS_QUALIFIERS["translation"].append(annotation_entry.desc)
-                                        elif annotation_entry.type == "DE":
-                                            _gene_QUALIFIERS["note"].append(annotation_entry.desc)
-                                            _CDS_QUALIFIERS["product"].append(annotation_entry.desc)
-                                        elif annotation_entry.type in ["BP_ARGOT", "CC_ARGOT", "MF_ARGOT"]: _CDS_QUALIFIERS["db_xref"].append("GO:" + annotation_entry.id)
-                                        elif annotation_entry.type == "EC_ARGOT":  _CDS_QUALIFIERS["db_xref"] = _CDS_QUALIFIERS["db_xref"] + [x for x in annotation_entry.keggId()]
-                                except StopIteration:
-                                    pass
-                                finally:
-                                    sub_sequence_annotations.close()
+            cmd("grep " + sub_sequence_id + " " + SEQUENCE_GFF_FILE + " > " + SUBSEQUENCE_GFF_FILE)
+            cmd("grep " + sub_sequence_id + " " + SEQUENCE_ANNOTATION_FILE + " > " + SUBSEQUENCE_ANNOTATION_FILE)
 
-                            """Features qualifiers appending and features appending to the record"""
-                            _gene_QUALIFIERS["gene"] = list(set(_gene_QUALIFIERS["gene"]))
-                            _gene_QUALIFIERS["note"] = list(set(_gene_QUALIFIERS["note"]))
-                            _mRNA_QUALIFIERS["gene"] = list(set(_mRNA_QUALIFIERS["gene"]))
-                            _mRNA_QUALIFIERS["standard_name"] = list(set(_mRNA_QUALIFIERS["standard_name"]))
-                            _CDS_QUALIFIERS["gene"] = list(set(_CDS_QUALIFIERS["gene"]))
-                            _CDS_QUALIFIERS["protein_id"] = list(set(_CDS_QUALIFIERS["protein_id"]))
-                            _CDS_QUALIFIERS["product"] = list(set(_CDS_QUALIFIERS["product"]))
-                            _CDS_QUALIFIERS["note"] = list(set(_CDS_QUALIFIERS["note"]))
-                            _CDS_QUALIFIERS["db_xref"] = list(set(_CDS_QUALIFIERS["db_xref"]))
-                            _CDS_QUALIFIERS["translation"] = list(set(_CDS_QUALIFIERS["translation"]))
-                            _gene_ = SeqFeature(_gene_LOCATION, type="gene")
-                            _gene_.qualifiers = _gene_QUALIFIERS
-                            _mRNA_ = SeqFeature(mergeLocations(_mRNA_LOCATION), type="mRNA")
-                            _mRNA_.qualifiers = _mRNA_QUALIFIERS
-                            _CDS_ = SeqFeature(mergeLocations(_CDS_LOCATION), type="CDS")
-                            _CDS_QUALIFIERS["db_xref"].sort()
-                            _CDS_.qualifiers = _CDS_QUALIFIERS
-                            _3_UTR_ = None if _3_UTR_LOCATION == None else SeqFeature(_3_UTR_LOCATION, type="3'UTR")
-                            _5_UTR_ = None if _5_UTR_LOCATION == None else SeqFeature(_5_UTR_LOCATION, type="5'UTR")
-                            _record_.features.append(_gene_)
-                            _record_.features.append(_mRNA_)
-                            _record_.features.append(_CDS_)
-                            if _3_UTR_ != None: _record_.features.append(_3_UTR_)
-                            if _5_UTR_ != None: _record_.features.append(_5_UTR_) 
-                    except StopIteration:
-                        pass
-                    finally:
-                        sub_sequences.close()
+            # Assertion of the creation of the previous files and folders
+            assert os.path.isfile(SUBSEQUENCE_GFF_FILE)
+            assert os.path.isfile(SUBSEQUENCE_ANNOTATION_FILE)
 
-                """Exons features creation for the whole record"""
-                with open(SEQUENCE_EXONS_FILE, "r") as exons:
-                    exons_lines = (line.rstrip("\n") for line in exons.readlines())
-                    try:
-                        while True:
-                            exon_entry = GFF_ENTRY(next(exons_lines))
-                            #if exon_entry.length() < 15: continue
-                            _exon_ = SeqFeature(FeatureLocation(exon_entry.start, exon_entry.end, exon_entry.strand), type="exon")
-                            _exon_.qualifiers = {"note":list()}
-                            _exon_.qualifiers["note"].append(exon_entry.exonId())
-                            _record_.features.append(_exon_)
-                    except StopIteration:
-                        pass
-                    finally:
-                        exons.close()              
-            #
-                #SEQUENCE_MISC_FILE = SEQUENCE_FOLDER + "misc.gff"
-                #cmd("grep \"" + sequence_id + "\" " + GFF_FILE + " | grep \":hit:\" > " + SEQUENCE_MISC_FILE)
-                #assert os.path.isfile(SEQUENCE_MISC_FILE)
-                #with open(SEQUENCE_MISC_FILE, "r") as misc_features:
-                #    misc_features_lines = (line.rstrip("\n") for line in misc_features.readlines())
-                #    try:
-                #        while True:
-                #            misc_feature_entry = GFF_ENTRY(next(misc_features_lines))
-                #            _misc_feature_ = SeqFeature(FeatureLocation(misc_feature_entry.start, misc_feature_entry.end, misc_feature_entry.strand), type="misc_feature")
-                #            _misc_feature_.qualifiers = {"note":list()}
-                #            _record_.features.append(_misc_feature_)
-                #    except StopIteration:
-                #        pass
-                #    finally:
-                #        pass
-                #    misc_features.close()
+            # Subsequence features initialization
+            _gene_ = {"location":None, "qualifiers":{"gene":sub_sequence_id, "note":list()}, "type":"gene"}
+            _mRNA_ = {"location":list(), "qualifiers":{"gene":sub_sequence_id, }, "type":"mRNA"}
+            _CDS_ = {"location":list(), "qualifiers":{"gene":sub_sequence_id, "product":list(), "note":list(), "db_xref":list(), "translation":list()}, "type":"CDS"}
+            _3UTR_ = {"location":None, "qualifiers":{"gene":sub_sequence_id, }, "type":"3'UTR"}
+            _5UTR_ = {"location":None, "qualifiers":{"gene":sub_sequence_id, }, "type":"5'UTR"}
 
-            except StopIteration:
-                pass
-            finally:
-                cmd("rm -r " + SEQUENCE_FOLDER)
+            # Subsequence features location
+            for gff_entry in gffIterator(SUBSEQUENCE_GFF_FILE):
+                location = FeatureLocation(gff_entry.start, gff_entry.end, strand=gff_entry.strand)
+                if gff_entry.type == "mRNA": _gene_["location"] = location
+                elif gff_entry.type == "exon": _mRNA_["location"].append(location)
+                elif gff_entry.type == "CDS": _CDS_["location"].append(location)
+                elif gff_entry.type == "three_prime_UTR": _3UTR_["location"] = location
+                elif gff_entry.type == "five_prime_UTR": _5UTR_["location"] = location
+            
+            # Merging features location to produce CompoundLocation
+            _mRNA_["location"] = mergeLocations(_mRNA_["location"])
+            _CDS_["location"] = mergeLocations(_CDS_["location"])
 
-                """Outputing record in embl format """
-                with open(OUTPUT_FILE, "w") as output_file:
-                    print(_record_.format("embl"), file=output_file)
+            # Subsequence features annotations
+            for annotation_entry in annotationIterator(SUBSEQUENCE_ANNOTATION_FILE):
+                if annotation_entry.type == "qseq":
+                    _CDS_["qualifiers"]["translation"].append(annotation_entry.desc)
+                elif annotation_entry.type == "DE":
+                    _gene_["qualifiers"]["note"].append(annotation_entry.desc)
+                    _CDS_["qualifiers"]["product"].append(annotation_entry.desc)
+                elif annotation_entry.type in ["BP_ARGOT", "CC_ARGOT", "MF_ARGOT"]:
+                    _CDS_["qualifiers"]["db_xref"].append("GO:" + annotation_entry.id)
+                elif annotation_entry.type == "EC_ARGOT":
+                     _CDS_["qualifiers"]["db_xref"].extend(annotation_entry.keggId())
 
-                cmd("java -jar embl-api-validator-1.1.265.jar " + OUTPUT_FILE)
+            # Appending features to record
+            for feature in [_gene_, _mRNA_, _CDS_, _3UTR_, _5UTR_]:
+                if feature["location"]: 
+                    _record_.features.append(SeqFeature(feature["location"], type=feature["type"], qualifiers=feature["qualifiers"]))
 
-        sequences.close()
+        # Exon features creation
+        for gff_entry in gffIterator(SEQUENCE_EXON_FILE):
+            _record_.features.append(SeqFeature(FeatureLocation(gff_entry.start, gff_entry.end, strand=gff_entry.strand), type="exon", qualifiers={"note":[gff_entry.exonId()]}))
+
+        # Printing output
+        with open(OUTPUT_FILE, "w") as file:
+            print(_record_.format("embl"), file=file)
+            file.close()
+
+        # Output validation
+        cmd("java -jar embl-api-validator-1.1.265.jar " + OUTPUT_FILE)
+
+        # Deleting temp sequence folder
+        cmd("rm -r " + SEQUENCE_FOLDER)
+
+        print("end of seq")
+
 
 if __name__ == "__main__":
     gffFile = fastaFile = annoFile = projFile = None
@@ -308,4 +344,4 @@ if __name__ == "__main__":
         else:
             assert False, "Invalid file input"
 
-    main(fastaFile, annoFile, gffFile, projFile)
+    main(projFile, fastaFile, gffFile, annoFile)   
