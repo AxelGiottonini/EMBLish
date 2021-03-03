@@ -176,6 +176,7 @@ def main(projectFile, fastaFile, gffFile, annotationFile):
     __PROJECT__ = None
     __TAXONOMY__ = None
     __TOPOLOGY__ = None
+    __TRANSL_TABLE__ = None
 
     for project_entry in (lineIterator(PROJECT_FILE)):
         parsed = re.split(r":", project_entry)
@@ -186,6 +187,7 @@ def main(projectFile, fastaFile, gffFile, annotationFile):
         elif parsed[0] == "PROJECT": __PROJECT__ = parsed[1]
         elif parsed[0] == "TAXONOMY": __TAXONOMY__ = re.split(r"-",parsed[1])
         elif parsed[0] == "TOPOLOGY": __TOPOLOGY__ = parsed[1]
+        elif parsed[0] == "TRANSL_TABLE": __TRANSL_TABLE__ = int(parsed[1])
 
     # Verifying that the project variables are all defined
     assert __DESCRIPTION__, "Description undefined"
@@ -195,6 +197,7 @@ def main(projectFile, fastaFile, gffFile, annotationFile):
     assert __PROJECT__, "Project undefined"
     assert __TAXONOMY__ , "Taxonomy undefined"
     assert __TOPOLOGY__, "Topology undefined"
+    assert __TRANSL_TABLE__, "Translation table undefined"
 
     # Contig file creation (the data contained in this file is complementary
     # to the data in the fasta file)
@@ -276,7 +279,7 @@ def main(projectFile, fastaFile, gffFile, annotationFile):
             # Subsequence features initialization
             _gene_ = {"location":None, "qualifiers":{"gene":sub_sequence_id, "note":list()}, "type":"gene"}
             _mRNA_ = {"location":list(), "qualifiers":{"gene":sub_sequence_id, }, "type":"mRNA"}
-            _CDS_ = {"location":list(), "qualifiers":{"gene":sub_sequence_id, "product":list(), "note":list(), "db_xref":list(), "translation":list()}, "type":"CDS"}
+            _CDS_ = {"location":list(), "qualifiers":{"gene":sub_sequence_id, "product":list(), "note":list(), "db_xref":list(), "translation":list(), "transl_table":__TRANSL_TABLE__}, "type":"CDS"}
             _3UTR_ = {"location":None, "qualifiers":{"gene":sub_sequence_id, }, "type":"3'UTR"}
             _5UTR_ = {"location":None, "qualifiers":{"gene":sub_sequence_id, }, "type":"5'UTR"}
 
