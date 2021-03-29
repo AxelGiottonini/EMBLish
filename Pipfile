@@ -5,6 +5,9 @@ name = "pypi"
 
 [packages]
 biopython = "*"
+tqdm = "*"
+pandas = "*"
+joblib = "*"
 
 [dev-packages]
 
