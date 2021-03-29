@@ -24,7 +24,8 @@ def read_gff(file):
     gff.columns = ["seq_id", "source", "ft_type", "start", "stop", "score", "strand", "phase", "attr"]
     gff = gff.sort_values(by=["seq_id"]).drop(["source", "score", "phase"], axis=1).dropna()
     gff["sub_seq_id"] = [re.split(r':',re.search("^ID=.*?;", x).group(0)[3:-1])[0] for x in gff["attr"]]
-    gff = gff[["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"]].sort_values(by=["seq_id", "sub_seq_id", "ft_type"]).set_index(["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"]) 
+    gff = gff[["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"]].sort_values(by=["seq_id", "sub_seq_id", "ft_type"]).set_index(["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"])
+    gff["start"].apply(lambda x: x-1)
     return gff
 
 def read_config(file):
