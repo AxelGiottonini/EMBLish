@@ -1,0 +1,49 @@
+# Axel Giottonini
+# test config.info
+# 14.05.2021
+
+<metadata>
+project:temp
+division:inv
+taxonomy:29031
+organism:Phlebotomus papatasi
+molecule_type:genomic DNA
+topology:linear
+description:empty
+transl_table:0
+</metadata>
+
+<plugins>
+fasta2handle:.fasta2handle,Plugins
+gff_maker2handle:.gff_maker2handle,Plugins
+tab_pannzer2handle:.tab_pannzer2handle,Plugins
+read_fasta:.read_fasta,Plugins
+read_gff_maker_3UTR:.read_gff_maker_3UTR,Plugins
+read_gff_maker_5UTR:.read_gff_maker_5UTR,Plugins
+read_gff_maker_CDS:.read_gff_maker_CDS,Plugins
+read_gff_maker_exon:.read_gff_maker_exon,Plugins
+read_gff_maker_gene:.read_gff_maker_gene,Plugins
+read_gff_maker_main:.read_gff_maker_main,Plugins
+read_gff_maker_mRNA:.read_gff_maker_mRNA,Plugins
+read_tab_pannzer_CDS:.read_tab_pannzer_CDS,Plugins
+read_tab_pannzer_gene:.read_tab_pannzer_gene,Plugins
+</plugins>
+
+<handles>
+fasta:fasta2handle,files/sequences.fasta
+gff_maker:gff_maker2handle,files/data.gff
+tab_pannzer:tab_pannzer2handle,files/anno.out
+</handles>
+
+<workflow>
+-read_fasta,fasta
+--read_gff_maker_main,gff_maker
+---read_gff_maker_gene,gff_maker
+----read_tab_pannzer_gene,tab_pannzer
+---read_gff_maker_mRNA,gff_maker
+---read_gff_maker_CDS,gff_maker
+----read_tab_pannzer_CDS,tab_pannzer
+---read_gff_maker_3UTR,gff_maker
+---read_gff_maker_5UTR,gff_maker
+--read_gff_maker_exon,gff_maker
+</workflow>
