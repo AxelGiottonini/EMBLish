@@ -47,7 +47,6 @@ if __name__ == "__main__":
     _GLOBALS_["plugins"]["read_gff_maker_gene"] = importlib.import_module(".read_gff_maker_gene","Plugins").Plugin()
     _GLOBALS_["plugins"]["read_gff_maker_main"] = importlib.import_module(".read_gff_maker_main","Plugins").Plugin()
     _GLOBALS_["plugins"]["read_gff_maker_mRNA"] = importlib.import_module(".read_gff_maker_mRNA","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_gff_maker_source"] = importlib.import_module(".read_gff_maker_source","Plugins").Plugin()
 
     _GLOBALS_["plugins"]["read_tab_pannzer_CDS"] = importlib.import_module(".read_tab_pannzer_CDS","Plugins").Plugin()
     _GLOBALS_["plugins"]["read_tab_pannzer_gene"] = importlib.import_module(".read_tab_pannzer_gene","Plugins").Plugin()
@@ -66,7 +65,6 @@ if __name__ == "__main__":
         [
             (_GLOBALS_["plugins"]["read_fasta"], _GLOBALS_["handles"]["fasta"], _GLOBALS_["metadata"], [
                 (_GLOBALS_["plugins"]["read_gff_maker_main"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], [
-                    (_GLOBALS_["plugins"]["read_gff_maker_source"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"],[])
                     (_GLOBALS_["plugins"]["read_gff_maker_gene"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], [
                         (_GLOBALS_["plugins"]["read_tab_pannzer_gene"], _GLOBALS_["handles"]["tab_panzer"], _GLOBALS_["metadata"], [])
                     ]),
