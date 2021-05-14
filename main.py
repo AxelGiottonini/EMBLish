@@ -7,25 +7,6 @@ import pandas as pd
 import re
 import importlib
 
-def fasta2handle(file_path):
-    with open(file_path) as handle:
-        return list(SeqIO.parse(handle, "fasta"))
-
-def gff_maker2handle(file_path):
-    with open(file_path) as handle:
-        gff = pd.read_csv(handle, sep="\t")
-        gff = gff.reset_index()
-        gff.columns = ["seq_id", "source", "ft_type", "start", "stop", "score", "strand", "phase", "attr"]
-        gff = gff.sort_values(by=["seq_id"]).drop(["source", "score", "phase"], axis=1).dropna()
-        gff["sub_seq_id"] = [re.split(r':',re.search("^ID=.*?;", x).group(0)[3:-1])[0] for x in gff["attr"]]
-        return gff[["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"]].sort_values(by=["seq_id", "sub_seq_id", "ft_type"]).set_index(["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"]) 
-    
-def tab_pannzer2handle(file_path):
-    with open(file_path) as handle:
-        anno = pd.read_csv(handle, sep="\t")
-        anno = anno.sort_values(by=["qpid", "type"]).drop(["score", "PPV"], axis=1).set_index(["qpid", "type", "id", "desc"])
-        return anno
-
 if __name__ == "__main__":
 
     _GLOBALS_ = {
@@ -34,48 +15,64 @@ if __name__ == "__main__":
         "metadata":dict()
     }
 
-    _GLOBALS_["handles"]["fasta"] = fasta2handle("files/sequences.fasta")
-    _GLOBALS_["handles"]["gff_maker"] = gff_maker2handle("files/data.gff")
-    _GLOBALS_["handles"]["tab_panzer"] = tab_pannzer2handle("files/anno.out")
+    _PROCESSING_ = {
+        "metadata":[],
+        "plugins":[],
+        "handles":[],
+        "workflow":[]
+    }
+    current_field = None
+    with open("files/config.info") as handle:
+        for line in handle:
+            current_line = line.rstrip("\n")
 
-    _GLOBALS_["plugins"]["read_fasta"] = importlib.import_module(".read_fasta","Plugins").Plugin()
+            if line[0] == "#": continue
+            if current_line == "": continue
 
-    _GLOBALS_["plugins"]["read_gff_maker_3UTR"] = importlib.import_module(".read_gff_maker_3UTR","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_gff_maker_5UTR"] = importlib.import_module(".read_gff_maker_5UTR","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_gff_maker_CDS"] = importlib.import_module(".read_gff_maker_CDS","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_gff_maker_exon"] = importlib.import_module(".read_gff_maker_exon","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_gff_maker_gene"] = importlib.import_module(".read_gff_maker_gene","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_gff_maker_main"] = importlib.import_module(".read_gff_maker_main","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_gff_maker_mRNA"] = importlib.import_module(".read_gff_maker_mRNA","Plugins").Plugin()
+            if current_field:
+                assert current_field in ["metadata", "plugins", "handles", "workflow"]
+                if re.match(r"^(<\/)(\w+)(>)$", current_line):
+                    current_field = None
+                else:
+                    _PROCESSING_[current_field].append(current_line) 
+            else:
+                assert re.match(r"^(<)(\w+)(>)$", current_line)
+                assert current_line[1:-1] in ["metadata", "plugins", "handles", "workflow"]
+                current_field = current_line[1:-1]
+        handle.close()
 
-    _GLOBALS_["plugins"]["read_tab_pannzer_CDS"] = importlib.import_module(".read_tab_pannzer_CDS","Plugins").Plugin()
-    _GLOBALS_["plugins"]["read_tab_pannzer_gene"] = importlib.import_module(".read_tab_pannzer_gene","Plugins").Plugin()
+    for element in _PROCESSING_["metadata"]:
+            _GLOBALS_["metadata"][element.split(":")[0]] = element.split(":")[1]
+    for element in _PROCESSING_["plugins"]:
+            _GLOBALS_["plugins"][element.split(":")[0]] = importlib.import_module(element.split(":")[1].split(",")[0],element.split(":")[1].split(",")[1]).Plugin()
+    for element in _PROCESSING_["handles"]:
+            _GLOBALS_["handles"][element.split(":")[0]] = _GLOBALS_["plugins"][element.split(":")[1].split(",")[0]].process(element.split(":")[1].split(",")[1])
 
+    max_level = 0
+    for i in range(len(_PROCESSING_["workflow"])):
+        element = _PROCESSING_["workflow"][i]
+        regex = re.compile(r"^(-)+")
+        level = len(regex.search(element).group())
+        max_level = max(max_level, level)
+        _PROCESSING_["workflow"][i] = (level, element[level:], [])
 
-    _GLOBALS_["metadata"]["project"] = "temp"
-    _GLOBALS_["metadata"]["division"] = "INV"
-    _GLOBALS_["metadata"]["taxonomy"] = "29031"
-    _GLOBALS_["metadata"]["organism"] = "Phlebotomus papatasi"
-    _GLOBALS_["metadata"]["molecule_type"] = "genomic DNA"
-    _GLOBALS_["metadata"]["topology"] = "linear"
-    _GLOBALS_["metadata"]["description"] = "description"
-    _GLOBALS_["metadata"]["transl_table"] = 0
+    _PROCESSING_["workflow"].insert(0, (0,None,[]))
 
-    app = app(
-        [
-            (_GLOBALS_["plugins"]["read_fasta"], _GLOBALS_["handles"]["fasta"], _GLOBALS_["metadata"], [
-                (_GLOBALS_["plugins"]["read_gff_maker_main"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], [
-                    (_GLOBALS_["plugins"]["read_gff_maker_gene"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], [
-                        (_GLOBALS_["plugins"]["read_tab_pannzer_gene"], _GLOBALS_["handles"]["tab_panzer"], _GLOBALS_["metadata"], [])
-                    ]),
-                    (_GLOBALS_["plugins"]["read_gff_maker_mRNA"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], []),
-                    (_GLOBALS_["plugins"]["read_gff_maker_CDS"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], [
-                        (_GLOBALS_["plugins"]["read_tab_pannzer_CDS"], _GLOBALS_["handles"]["tab_panzer"], _GLOBALS_["metadata"], [])
-                    ]),
-                    (_GLOBALS_["plugins"]["read_gff_maker_3UTR"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], []),
-                    (_GLOBALS_["plugins"]["read_gff_maker_5UTR"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], [])
-                ]),
-                (_GLOBALS_["plugins"]["read_gff_maker_exon"], _GLOBALS_["handles"]["gff_maker"], _GLOBALS_["metadata"], [])
-            ])
-        ])
+    for i in range(max_level, -1, -1):
+        for j in range(len(_PROCESSING_["workflow"])):
+            element = _PROCESSING_["workflow"][j]
+            if element[0] == i:
+                for k in range(1, j+1):
+                    if _PROCESSING_["workflow"][j-k] is not None and _PROCESSING_["workflow"][j-k][0] == i-1:
+                        _PROCESSING_["workflow"][j-k][2].append((
+                            _GLOBALS_["plugins"][_PROCESSING_["workflow"][j][1].split(",")[0]],
+                            _GLOBALS_["handles"][_PROCESSING_["workflow"][j][1].split(",")[1]],
+                            _GLOBALS_["metadata"],
+                            _PROCESSING_["workflow"][j][2]
+                        ))
+                        _PROCESSING_["workflow"][j] = None
+                        break
+        _PROCESSING_["workflow"] = [x for x in _PROCESSING_["workflow"] if x is not None]
+
+    app = app(_PROCESSING_["workflow"][0][2])
     app.run()
