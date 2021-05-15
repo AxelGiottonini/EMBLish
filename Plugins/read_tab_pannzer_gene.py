@@ -1,28 +1,45 @@
 #read_tab_pannzer_gene.py
 
-#read_tab_pannzer_CDS
-
 import pandas as pd
 
 class Plugin:
 
-    def process(self, handle, metadata, calls:list=[], target=None):
+    def feature_initialize(self, pre_feature, metadata):
+        return {
+            "note": self.feature_initialize_note(pre_feature)
+        }
 
-        #initialisation
+    def feature_initialize_note(self, pre_feature):
+        sender = list()
         try:
-            anno_de =  handle.loc[(target[1], "DE"),:].reset_index().iloc[0,1]
+            sender = [pre_feature("DE").iloc[0,1]]
         except KeyError:
-            anno_de = []
+            pass
+        return sender
 
-        _annotations_ = [{
-            "note": anno_de
-        }]
+    def callbacks(self, app, calls, target):
+        sender = []
 
+        for app, key_plugin, *args in calls:
+            temp = app.plugins[key_plugin].process(app, *args, target)
+            if temp:
+                sender += temp
     
-        #calls
-        receiver = []
-        for call,*args in calls:
-            receiver.extend(call.process(*args, target=target))
+        return sender
 
-        #output
-        return _annotations_
+    def merge(self, feature, receiver):
+        return feature
+
+    def process(self, app, key_handle, calls:list=[], target=None):
+
+        feature = self.feature_initialize(            
+            (lambda field: app.handles[key_handle].loc[(target[1], field)].reset_index()),
+            app.metadata)
+
+        receiver = self.callbacks(
+            app,
+            calls,
+            target
+        )
+
+        return self.merge(feature, receiver)

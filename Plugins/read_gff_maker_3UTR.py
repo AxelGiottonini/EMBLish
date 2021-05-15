@@ -5,23 +5,47 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 class Plugin:
 
-    def process(self, handle, metadata, calls:list=[], target=None):
-        try:
-            location = (handle.loc[(target[0], f"{target[1]}-mRNA-1", "three_prime_UTR"),:].reset_index())
+    """
+    """
+    def feature_initialize(self, pre_feature, metadata):
+        return SeqFeature(
+            FeatureLocation(int(pre_feature["start"]), int(pre_feature["stop"]), (1,-1)[pre_feature["strand"] == "-"]),
+            type="3'UTR",
+            qualifiers={
+                "gene":None,
+                "note":list()})
+    
+    """
+    """
+    def callbacks(self, app, calls, target):
+        sender = []
 
-            _sub_features_ = [
-                SeqFeature(
-                    FeatureLocation(int(location.iloc[0,0]), int(location.iloc[0,1]), (1,-1)[location.iloc[0,2] == "-"]),
-                    type="3'UTR",
-                    qualifiers={
-                        "gene":target[1],
-                        "note":list()})]
-                
-            #calls
-            receiver = []
-            for call,*args in calls:
-                receiver.extend(call.process(*args, target=(target[0], f"{target[1]}-mRNA-1", "3'UTR")))
-            
-            return _sub_features_
+        for app, key_plugin, *args in calls:
+            temp = app.plugins[key_plugin].process(app, *args, target)
+            if temp:
+                sender.append(temp)
+
+        return sender
+    
+    """
+    """
+    def merge(self, feature, receiver):
+        return feature
+
+    """
+    """
+    def process(self, app, key_handle, calls:list=[], target=None):
+        try:
+            feature = self.feature_initialize(
+                app.handles[key_handle].loc[(target[0], f"{target[1]}-mRNA-1", "three_prime_UTR"),:].reset_index().iloc[0,:],
+                app.metadata)
         except KeyError:
-            return []
+            return None
+
+        feature.qualifiers["gene"] = target[1]
+        receiver = self.callbacks(
+            app,
+            calls,
+            (target[0], f"{target[1]}-mRNA-1", "3'UTR"))
+        
+        return self.merge(feature, receiver)

@@ -4,45 +4,77 @@ import pandas as pd
 
 class Plugin:
 
-    def process(self, handle, metadata, calls:list=[], target=None):
+    """
+    """
+    def feature_initialize(self, pre_feature, metadata):
+        #print(self.feature_initialize_db_xref(pre_feature))
+        return {
+            "db_xref": self.feature_initialize_db_xref(pre_feature),
+            "translation": self.feature_initialize_translation(pre_feature),
+            "product": self.feature_initialize_product(pre_feature)
+        }
 
-        #initialisation
+    """
+    """
+    def feature_initialize_db_xref(self, pre_feature):
+        sender = pd.Series([])
+
+        for field in ["BP_ARGOT", "CC_ARGOT", "MF_ARGOT"]:
+            try:
+                sender = pd.concat([sender, pre_feature(field)["id"]])
+            except KeyError:
+                pass
+        return [f"GO:{str(element)}" for element in sender]
+
+    """
+    """
+    def feature_initialize_translation(self, pre_feature):
+        sender = list()
         try:
-            anno_bp = handle.loc[(target[1], "BP_ARGOT"),:].reset_index()["id"]
+            sender = [pre_feature("qseq").iloc[0,1]]
         except KeyError:
-            anno_bp = pd.Series([])
+            pass
+        return sender 
 
+    """
+    """
+    def feature_initialize_product(self, pre_feature):
+        sender = list()
         try:
-            anno_cc = handle.loc[(target[1], "CC_ARGOT"),:].reset_index()["id"]
+            sender = [pre_feature("DE").iloc[0,1]]
         except KeyError:
-            anno_cc = pd.Series([])
+            pass
+        return sender
 
-        try:
-            anno_mf = handle.loc[(target[1], "MF_ARGOT"),:].reset_index()["id"]
-        except KeyError:
-            anno_mf = pd.Series([])
+    """
+    """
+    def callbacks(self, app, calls, target):
+        sender = []
 
-        try:
-            anno_qsec = [handle.loc[(target[1], "qseq"),:].reset_index().iloc[0,1]]
-        except KeyError:
-            anno_qsec = list()
-
-        try:
-            anno_de =  [handle.loc[(target[1], "DE"),:].reset_index().iloc[0,1]]
-        except KeyError:
-            anno_de = list()
-
-        _annotations_ = [{
-            "db_xref":[f"GO:{str(go)}" for go in pd.concat([anno_bp, anno_cc, anno_mf])],
-            "translation": anno_qsec,
-            "product": anno_de
-        }]
-
+        for app, key_plugin, *args in calls:
+            temp = app.plugins[key_plugin].process(app, *args, target)
+            if temp:
+                sender += temp
     
-        #calls
-        receiver = []
-        for call,*args in calls:
-            receiver.extend(call.process(*args, target=target))
+        return sender
 
-        #output
-        return _annotations_
+    """
+    """
+    def merge(self, feature, receiver):
+        return feature
+
+    """
+    """
+    def process(self, app, key_handle, calls:list=[], target=None):
+
+        feature = self.feature_initialize(
+            (lambda field: app.handles[key_handle].loc[(target[1], field)].reset_index()),
+            app.metadata)
+
+        receiver = self.callbacks(
+            app,
+            calls,
+            target
+        )
+
+        return self.merge(feature, receiver)

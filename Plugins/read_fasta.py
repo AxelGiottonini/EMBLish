@@ -1,6 +1,5 @@
 #plugin.py
 
-import importlib
 import itertools
 
 from Bio import SeqIO
@@ -8,27 +7,46 @@ from Bio.SeqRecord import SeqRecord
 
 class Plugin:
 
-    def process(self, handle, metadata, calls:list=[], target=None):
+    """
+    """
+    def feature_initialize(self, pre_feature, metadata):
+        return SeqRecord(
+            pre_feature.seq,
+            pre_feature.id,
+            dbxrefs=["Project:" + metadata["project"]],
+            annotations={
+                "division":metadata["division"],
+                "molecule_type":metadata["molecule_type"],
+                "organism":metadata["organism"],
+                "taxonomy":metadata["taxonomy"],
+                "topology":metadata["topology"]},
+            description="")
+    
+    """
+    """
+    def callbacks(self, app, calls, target):
+        sender = []
 
-            for record in handle:
+        for app, key_plugin, *args in calls:
+            temp = app.plugins[key_plugin].process(app, *args, target)
+            if temp:
+                sender += temp
+    
+        return sender
 
-                #initialize record
-                _record_ = SeqRecord(
-                    record.seq,
-                    record.id,
-                    dbxrefs=["Project:" + metadata["project"]],
-                    annotations={"division":metadata["division"],"molecule_type":metadata["molecule_type"],"organism":metadata["organism"],"taxonomy":metadata["taxonomy"],"topology":metadata["topology"]},
-                    description=""
-                )
+    """
+    """
+    def merge(self, feature, receiver):
+        feature.features = receiver    
 
-                #calls
-                receiver = []
-                for call,*args in calls:
-                    receiver.extend(call.process(*args, target=_record_.id))
-        
-                #post output treatment
-                _record_.features = list(itertools.chain(*receiver))
+    """
+    """
+    def process(self, app, key_handle, calls:list=[], target=None):
 
-                #outputing
-                with open(f"out/{_record_.id}.dat", "w") as o:
-                    print(_record_.format("embl"), file=o)
+        for element in app.handles[key_handle]:
+            feature = self.feature_initialize(element, app.metadata)
+            receiver = self.callbacks(app, calls, (feature.id))
+            self.merge(feature, receiver)
+            
+            with open(f"out/{feature.id}.dat", "w") as o:
+                print(feature.format("embl"), file=o)

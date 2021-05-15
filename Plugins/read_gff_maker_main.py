@@ -1,35 +1,66 @@
 #read_gff_maker_main.py
 
 import pandas as pd
-import re
 
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 class Plugin:
+    """
+    """
+    def feature_initialize(self, pre_feature, metadata):
+        return SeqFeature(
+            FeatureLocation(int(pre_feature["start"]), int(pre_feature["stop"]), (1,-1)[pre_feature["strand"] == "-"]),
+            type="source",
+            qualifiers={
+                "oganism":metadata["organism"],
+                "mol_type":metadata["molecule_type"],
+                "db_xref":list()})
+    
+    """
+    """
+    def callbacks(self, app, calls, target):
+        sender = []
 
-    def process(self, handle, metadata, calls:list=[], target=None):
-        
-        location = (handle.loc[(target, slice(None), "contig"),:].reset_index())
-        _feature_ = [
-            SeqFeature(
-                FeatureLocation(int(location.iloc[0,3]), int(location.iloc[0,4]), (1,-1)[location.iloc[0,5] == "-"]),
-                type="source",
-                qualifiers={
-                    "oganism":metadata["organism"],
-                    "mol_type":metadata["molecule_type"],
-                    "db_xref":list()})]
+        for app, key_plugin, *args in calls:
+            temp = app.plugins[key_plugin].process(app, *args, target)
+            if temp:
+                sender.append(temp)
 
-        yield _feature_
+        return sender
 
-        for gene in handle.loc[(target, slice(None), "gene"),:].reset_index()["sub_seq_id"]:
+    """
+    """
+    def callbacks_with_iterator(self, app, calls, target, iterator):
+        sender = []
+
+        for element in iterator:
+            temp = self.callbacks(app, calls, (target, element))
+            if temp:
+                sender.extend(temp)
+        return sender
             
-            #initialize features
-            _features_subset_ = []
-               
-            #calls
-            receiver = []
-            for call,*args in calls:
-                receiver.extend(call.process(*args, target=(target, gene)))
+    """
+    """
+    def merge(self, feature, receiver):
+        return [feature] + receiver
 
-            _features_subset_ = receiver
-            yield _features_subset_
+    """
+    """
+    def process(self, app, key_handle, calls:list=[], target=None):
+        try:
+            feature = self.feature_initialize(
+                app.handles[key_handle].loc[(target, slice(None), "contig"),:].reset_index().iloc[0,:], 
+                app.metadata)
+        except KeyError:
+            return None
+
+        try:
+            receiver = self.callbacks_with_iterator(
+                app, 
+                calls, 
+                target, 
+                app.handles[key_handle].loc[(target, slice(None), "gene"),:].reset_index()["sub_seq_id"])
+        except KeyError:
+            receiver = []
+        
+        return  self.merge(feature, receiver)
