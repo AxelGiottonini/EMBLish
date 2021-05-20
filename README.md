@@ -2,9 +2,13 @@
 
 ## Config file example
 ```
-# Axel Giottonini
-# test config.info
-# 19.05.2021
+python3 main.py config.info
+```
+
+```
+# @author : Axel Giottonini
+# @file : config.info
+# @date : 19.05.2021
 
 <metadata>
 project:PRJEB1234
