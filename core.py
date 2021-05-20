@@ -3,12 +3,26 @@
 import importlib
 import re
 
-class app:
+"""
+"""
+class App:
+    """
+        Description:
+
+        Arguments:
+
+        Output:
+
+        Note:
+    """
     def __init__(self, config_path):
+
         self.metadata = None
         self.plugins = None
         self.handles = None
         self.workflow = None
+
+        self.current_sequence = None
 
         config = self.read_config(config_path)
 
@@ -17,16 +31,16 @@ class app:
         self.set_handles(config["handles"])
         self.set_workflow(config["workflow"])
 
+        self.all_plugins_required_metadata_check()
+
     """
-    This function reads the config file which is divided into four fields :
-        - metadata: contains the general and shared informations for EMBLish
-            as a couple key:value
-        - plugins: contains the list of the plugins that will be used as a
-            triplet plugin_key:plugin_name,plugin_package
-        - handles: contains the list of files that will be used as inputs as
-            a triplet handle_key:plugin,file_path
-        - workflow: contains a hierarchical list of the different step to run
-            as a couple plugin_key,handle_key
+        Description:
+
+        Arguments:
+
+        Output:
+
+        Note:
     """
     def read_config(self, config_path):
         config = {
@@ -67,26 +81,68 @@ class app:
         return config
 
     """
-    This function converts the array containing the metadata into a dictionnary
+        Description:
+            - converts the array containing the metadata into a dictionnary by splitting
+            each string containing the metadata key and metadata value into an item with 
+            the key and value.
+        Arguments:
+            - array: list of strings
+        Output:
+            - dictionnary of strings
+        Note:
     """
-    def set_metadata(self, array):
-        self.metadata = {element.split(":")[0]:element.split(":")[1] for element in array}
+    def set_metadata(self, array:list):
+        
+        def convert(value):
+            temp = value.split(",")
+            if len(temp) > 1:
+                if temp[1] == "int":
+                    return int(temp[0])
+            return value
+
+        self.metadata = {element.split(":")[0]:convert(element.split(":")[1]) for element in array}
 
     """
-    This function converts the array containing the plugins parameters into a dictionnary 
-    with plugins to call with their key
+        Description:
+            - converts the array containing the plugins parameters (name, package) into a
+            dictionnary by splitting each string containing the plugin key, the plugin name
+            and the plugin package into an item with the key and the callable plugin.
+            Store the result in the self.metadata variable.
+        Arguments:
+            - array: list of strings
+        Output:
+            - dictionnary of plugin objects
+        Note:
     """
-    def set_plugins(self, array):
+    def set_plugins(self, array:list):
         self.plugins = {element.split(":")[0]:importlib.import_module(element.split(":")[1].split(",")[0],element.split(":")[1].split(",")[1]).Plugin() for element in array}
 
     """
-    This function converts the array containing the handles parameters into a dictionnary
-    with handles to call with their key
+        Description:
+            - converts the array containing the handles parameters into a dictionnary by 
+            splitting each string containing the handle key, the handle converter and the
+            file path into an item with the key and the converted as a data frame handle.
+            Store the result in the self.plugin variable.
+        Arguments:
+            - array: list of strings
+        Output:
+            - dictionnary of data frames
+        Note:
     """
     def set_handles(self, array):
         self.handles = {element.split(":")[0]:self.plugins[element.split(":")[1].split(",")[0]].process(element.split(":")[1].split(",")[1]) for element in array}
     
     """
+        Description:
+            - converts the array containing the workflow into a recursive automaton where
+            task are described by a tuple containing the required plugin, the handle where
+            the data is found and a list of elements to call.
+            Store the result in the self.handles variable.
+        Arguments:
+            - array: list of strings
+        Output (assigned):
+            - array: list of tuples (recursive)
+        Note:
     """
     def set_workflow(self, array):
         temp = self.refactor_workflow(array)
@@ -94,7 +150,14 @@ class app:
         self.workflow = self.convert_workflow_task(temp[0])
 
     """
-    Convert the list element in triplet level,<plugin_key,handle_key>,[]
+        Description:
+            - converts strings into a tuple containing the level of the task, the rest of the 
+            string and an empty array.
+        Arguments:
+            - array list of strings
+        Output:
+            - array: list of tuples
+        Note:
     """
     def refactor_workflow(self, array):
 
@@ -107,7 +170,13 @@ class app:
         return array
 
     """
-    Order the elements and create the hierarchical nodes
+        Description:
+            - place the tasks in their parent (level-1) tasks array 
+        Arguments:
+            - array: list of tuples
+        Output:
+            -  array: list of tuples (recursive)
+        Note:
     """
     def merge_workflow(self, array):
         array.insert(0, (0,None,[]))
@@ -133,12 +202,22 @@ class app:
         return array
 
     """
+        Description:
+            - recursively converts the tuples containing the task string into a tuple containing 
+            a reference to the application, the plugin key, the handle key and an array of 
+            subtasks.
+        Arguments:
+            - array: list of tuples (recursive)
+        Output:
+            - array: list of tuples (recusrive)
+        Note:
     """
     def convert_workflow_task(self, task):
         if task[1]:
             return (
                 self,
                 task[1].split(",")[0],
+                task[1].split(",")[2] if len(task[1].split(",")) > 2 else "default",
                 task[1].split(",")[1],
                 [self.convert_workflow_task(sub_task) for sub_task in task[2]]
             )
@@ -146,7 +225,43 @@ class app:
         return [self.convert_workflow_task(sub_task) for sub_task in task[2]]
         
     """
+        Description:
+
+        Arguments:
+
+        Output:
+
+        Note:
+    """
+    def all_plugins_required_metadata_check(self):
+        for key, plugin in self.plugins.items():
+            if not plugin.required_metadata_check(self):
+                raise InvalidConfigurationError(f"{key} plugin could not find required metadata")
+
+    """
+        Description:
+
+        Arguments:
+
+        Output:
+
+        Note:
     """
     def run(self):
         for app, key_plugin, *args in self.workflow:
             app.plugins[key_plugin].process(app, *args)
+
+"""
+"""
+class InvalidConfigurationError(Exception):
+    def __init__(self, *args):
+        if args:
+            self.message = args[0]
+        else:
+            self.message = None
+
+    def __str__(self):
+        if self.message:
+            return f"InvalidConfigurationError, {self.message}"
+        else:
+            return "InvalidConfigurationError has been raised"
