@@ -3,10 +3,11 @@
 import pandas as pd
 import re
 
+from Plugins.__read_gff_maker__ import __ReadGFFMaker__
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 
-class Plugin:
+class Plugin(__ReadGFFMaker__):
 
     """
     """
@@ -22,26 +23,10 @@ class Plugin:
         for _, element in pre_multi_feature:
             yield self.feature_initialize(element, metadata)
 
-    """
-    """
-    def callbacks(self, app, calls, target):
-        sender = []
-
-        for app, key_plugin, *args in calls:
-            temp = app.plugins[key_plugin].process(app, *args, target)
-            if temp:
-                sender.append()
-
-        return sender
-    
-    """
-    """
-    def merge(self, feature, receiver):
-        return feature
 
     """
     """
-    def process(self, app, key_handle, calls:list=[], target=None):
+    def process(self, app, caller_mode, key_handle, calls:list=[], target=None):
         try:
             feature = self.multi_feature_initialize(
                 app.handles[key_handle].loc[(target, slice(None), "exon"),:].reset_index().iterrows(),

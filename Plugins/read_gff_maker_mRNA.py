@@ -1,9 +1,10 @@
 #read_gff_maker_mRNA.py
 
 import pandas as pd
+from Plugins.__read_gff_maker__ import __ReadGFFMaker__
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
-class Plugin:
+class Plugin(__ReadGFFMaker__):
 
     """
     """
@@ -26,26 +27,8 @@ class Plugin:
         )
 
     """
-    """    
-    def callbacks(self, app, calls, target):
-        sender = []
-
-        for app, key_plugin, *args in calls:
-            temp = app.plugins[key_plugin].process(app, *args, target)
-            if temp:
-                sender.append(temp)
-
-        return sender
-
-
     """
-    """
-    def merge(self, feature, receiver):
-        return feature
-
-    """
-    """
-    def process(self, app, key_handle, calls:list=[], target=None):
+    def process(self, app, caller_mode, key_handle, calls:list=[], target=None):
         try:
             feature = self.feature_initialize(
                 app.handles[key_handle].loc[(target[0], f"{target[1]}-mRNA-1", "CDS"),:].reset_index(),

@@ -1,8 +1,9 @@
 #read_tab_pannzer_gene.py
 
 import pandas as pd
+from Plugins.__read_tab_pannzer__ import __ReadTabPannzer__
 
-class Plugin:
+class Plugin(__ReadTabPannzer__):
 
     def feature_initialize(self, pre_feature, metadata):
         return {
@@ -27,15 +28,11 @@ class Plugin:
     
         return sender
 
-    def merge(self, feature, receiver):
-        return feature
-
-    def process(self, app, key_handle, calls:list=[], target=None):
+    def process(self, app, caller_mode, key_handle, calls:list=[], target=None):
 
         feature = self.feature_initialize(            
             (lambda field: app.handles[key_handle].loc[(target[1], field)].reset_index()),
             app.metadata)
-
         receiver = self.callbacks(
             app,
             calls,
