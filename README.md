@@ -6,6 +6,15 @@ python3 main.py config.info
 ```
 
 ```
+cd
+|----config.info
+|----sequences.fasta
+|----data.gff
+|----anno.out
+```
+
+
+```
 # @author : Axel Giottonini
 # @file : config.info
 # @date : 19.05.2021
