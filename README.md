@@ -1,5 +1,6 @@
-# GFF3-Tabular_to_EMBL
+# EMBLish
 
+## Config file example
 ```
 # Axel Giottonini
 # test config.info
