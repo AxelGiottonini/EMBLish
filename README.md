@@ -1,7 +1,5 @@
 # GFF3-Tabular_to_EMBL
 
-## Config file example 
-
 ```
 # Axel Giottonini
 # test config.info
@@ -56,4 +54,5 @@ tab_pannzer:to_handle_tab_pannzer,anno.out
 ---read_gff_maker_5UTR,gff_maker
 --read_gff_maker_exon,gff_maker
 </workflow>
+
 ```
