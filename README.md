@@ -5,9 +5,8 @@ EMBLish aims to provide a tool for converting gene prediction files such as Make
  </i>
  
 ## Prerequistes:
-- Python >= ?
-- Biopython >= ?
-- Pandas >= ?
+- Python >= 3.9.0
+- Biopython >= 1.78
 
 ## Download with git:
 ```
