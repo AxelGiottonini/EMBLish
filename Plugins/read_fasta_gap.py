@@ -31,7 +31,7 @@ class Plugin(__Read__):
     def process(self, app, caller_mode, key_handle, calls:list=[], target=None):
         try:
             temp = str(list(filter(lambda seq: seq.id == target, app.handles[key_handle]))[0].seq)
-            pre_multi_feature = [gap.span() for gap in re.finditer(r"n+", temp)]
+            pre_multi_feature = [gap.span() for gap in re.finditer(r"(n|N)+", temp)]
             
             feature = self.multi_feature_initialize(
                     pre_multi_feature,
