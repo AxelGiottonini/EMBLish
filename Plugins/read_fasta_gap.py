@@ -13,7 +13,8 @@ class Plugin(__Read__):
         return SeqFeature(
             FeatureLocation(pre_feature[0], pre_feature[1], 1),
             type="gap",
-            qualifiers={})
+            qualifiers={
+                "estimated_length":str(pre_feature[1]-pre_feature[0])})
 
     """
     """
