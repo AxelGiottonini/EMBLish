@@ -13,7 +13,8 @@ class Plugin(__Read__):
         return SeqFeature(
             FeatureLocation(pre_feature[0], pre_feature[1], 1),
             type="gap",
-            qualifiers={})
+            qualifiers={
+                "estimated_length":str(pre_feature[1]-pre_feature[0])})
 
     """
     """
@@ -31,7 +32,7 @@ class Plugin(__Read__):
     def process(self, app, caller_mode, key_handle, calls:list=[], target=None):
         try:
             temp = str(list(filter(lambda seq: seq.id == target, app.handles[key_handle]))[0].seq)
-            pre_multi_feature = [gap.span() for gap in re.finditer(r"n+", temp)]
+            pre_multi_feature = [gap.span() for gap in re.finditer(r"(n|N)+", temp)]
             
             feature = self.multi_feature_initialize(
                     pre_multi_feature,

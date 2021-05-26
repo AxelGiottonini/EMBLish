@@ -22,6 +22,7 @@ from Plugins.read_tab_pannzer_CDS import Plugin
 from Plugins.read_tab_pannzer_gene import Plugin
 
 from Plugins.to_handle_fasta import Plugin
+from Plugins.to_handle_gff import Plugin
 from Plugins.to_handle_gff_maker import Plugin
 from Plugins.to_handle_tab_pannzer import Plugin
 
