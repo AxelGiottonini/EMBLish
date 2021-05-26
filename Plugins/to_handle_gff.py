@@ -72,10 +72,3 @@ class Plugin(__Plugin__):
             temp.drop("attributes", axis=1, inplace=True)
 
             return temp
-
-
-"""
-main behavior to test the plugin
-"""
-if __name__ == "__main__":
-    print(Plugin().process(sys.argv[1]))
