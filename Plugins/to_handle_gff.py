@@ -34,8 +34,7 @@ class Plugin(__Plugin__):
     def process(self, file_path):
 
         with open(file_path) as handle:
-            temp = pd.read_csv(handle, sep="\t", comment="#")
-            temp.reset_index()
+            temp = pd.read_csv(handle, sep="\t", comment="#", header=None)
             temp.columns = [
                 "seqid",
                 "source",
@@ -70,5 +69,4 @@ class Plugin(__Plugin__):
             temp["attributes_ontology_term"]    = temp["attributes"].apply(lambda x: extract_attribute("Ontology_term",x))
 
             temp.drop("attributes", axis=1, inplace=True)
-
             return temp

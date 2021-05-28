@@ -1,7 +1,6 @@
-#read_gff_maker_exon.py
+#Plugins/read_gff_maker_exon.py
 
 import pandas as pd
-import re
 
 from Plugins.__read_gff_maker__ import __ReadGFFMaker__
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
@@ -13,7 +12,9 @@ class Plugin(__ReadGFFMaker__):
     """
     def feature_initialize(self, pre_feature, metadata):
         return SeqFeature(
-            FeatureLocation(int(pre_feature["start"]), int(pre_feature["stop"]), (1,-1)[pre_feature["strand"] == "-"]),
+            FeatureLocation(int(pre_feature["start"]), 
+                            int(pre_feature["end"]), 
+                            (1,-1)[pre_feature["strand"] == "-"]),
             type="exon",
             qualifiers={})
     
@@ -28,9 +29,8 @@ class Plugin(__ReadGFFMaker__):
     """
     def process(self, app, caller_mode, key_handle, calls:list=[], target=None):
         try:
-            feature = self.multi_feature_initialize(
-                app.handles[key_handle].loc[(target, slice(None), "exon"),:].reset_index().iterrows(),
-                app.metadata)
+            pre_multi_feature = app.handles[key_handle].loc[(target, slice(None), "exon"),:].iterrows()
+            feature = self.multi_feature_initialize(pre_multi_feature, app.metadata)
         except KeyError:
             return None
             
