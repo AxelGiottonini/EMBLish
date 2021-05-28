@@ -40,6 +40,7 @@ transl_table:1,int
 
 <plugins>
 read_fasta:.read_fasta,Plugins
+read_fasta_gap:.read_fasta_gap,Plugins
 read_gff_maker_3UTR:.read_gff_maker_3UTR,Plugins
 read_gff_maker_5UTR:.read_gff_maker_5UTR,Plugins
 read_gff_maker_CDS:.read_gff_maker_CDS,Plugins
@@ -75,6 +76,7 @@ tab_pannzer:to_handle_tab_pannzer,anno.out
 ---read_gff_maker_3UTR,gff_maker
 ---read_gff_maker_5UTR,gff_maker
 --read_gff_maker_exon,gff_maker
+--read_fasta_gap,fasta 
 </workflow>
 ```
 ##### `metadata`
