@@ -45,6 +45,10 @@ class Plugin(__Plugin__):
                 "strand",
                 "phase",
                 "attributes"]
+            
+            temp.drop_duplicates(
+                    subset=["seqid", "type", "start", "end", "strand"],
+                    inplace=True)
 
             temp["start"] = temp["start"].apply(lambda x: x - 1)
            
