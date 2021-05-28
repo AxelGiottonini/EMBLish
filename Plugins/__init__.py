@@ -17,7 +17,6 @@ from Plugins.read_gff_maker_exon import Plugin
 from Plugins.read_gff_maker_gene import Plugin
 from Plugins.read_gff_maker_mRNA import Plugin
 from Plugins.read_gff_maker_source import Plugin
-from Plugins.read_gff_maker_test import Plugin
 
 from Plugins.read_tab_pannzer_CDS import Plugin
 from Plugins.read_tab_pannzer_gene import Plugin
