@@ -1,4 +1,4 @@
-#read_gff_maker_CDS.py
+#Plugins/read_gff_maker_CDS.py
 
 import pandas as pd
 import itertools
@@ -11,9 +11,9 @@ class Plugin(__ReadGFFMaker__):
     """
     def feature_initialize(self, pre_feature, metadata):
         refactor_pre_feature = lambda element: FeatureLocation(
-            int(element[0]),
-            int(element[1]),
-            (1,-1)[element[2] == "-"])
+            int(element["start"]),
+            int(element["end"]),
+            (1,-1)[element["strand"] == "-"])
         merge_pre_feature = lambda  array: array[0] if len(array) == 1 else CompoundLocation(array)
 
         return SeqFeature(
@@ -40,18 +40,20 @@ class Plugin(__ReadGFFMaker__):
     """
     def process(self, app, caller_mode, key_handle, calls:list=[], target=None):
         try:
-            feature = self.feature_initialize(
-                app.handles[key_handle].loc[(target[0], f"{target[1]}-mRNA-1", "CDS"),:].reset_index(),
-                app.metadata)
+            pre_feature = app.handles[key_handle].loc[(target[0], f"{target[1]}-mRNA-1:cds", "CDS"),:]
+            feature = self.feature_initialize(pre_feature, app.metadata)
+            feature.qualifiers["gene"] = target[1]
         except KeyError:
             return None
-            
-        feature.qualifiers["gene"] = target[1]
-        receiver = self.callbacks(
-            app,
-            calls,
-            (target[0], f"{target[1]}-mRNA-1", "CDS"))
-        
+
+        try:
+            receiver = self.callbacks(
+                    app,
+                    calls,
+                    (target[0], f"{target[1]}-mRNA-1", "CDS"))
+        except KeyError:
+            receiver = []
+
         return self.merge(feature, receiver)
 
     """

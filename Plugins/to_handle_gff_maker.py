@@ -2,17 +2,44 @@
 
 import pandas as pd
 import re
-from Plugins.__plugin__ import __Plugin__
+from Plugins.to_handle_gff import Plugin
 
-class Plugin(__Plugin__):
+class Plugin(Plugin):
 
+    """
+        Attributes
+            file_path : string, path to the file to convert
+        Return
+            pandas data frame of __ columns:
+                0. Index:
+                    seqid
+                    attributes_id
+                    type
+                1. start
+                2. end
+                3. strand
+    """
     def process(self, file_path):
-        with open(file_path) as handle:
-            gff = pd.read_csv(handle, sep="\t")
-            gff = gff.reset_index()
-            gff.columns = ["seq_id", "source", "ft_type", "start", "stop", "score", "strand", "phase", "attr"]
-            gff = gff.sort_values(by=["seq_id"]).drop(["source", "score", "phase"], axis=1).dropna()
-            gff["sub_seq_id"] = [re.split(r':',re.search("^ID=.*?;", x).group(0)[3:-1])[0] for x in gff["attr"]]
-            gff["start"] = gff["start"].apply(lambda x: x-1)
-            return gff[["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"]].sort_values(by=["seq_id", "sub_seq_id", "ft_type"]).set_index(["seq_id", "sub_seq_id", "ft_type", "start", "stop", "strand"]) 
         
+        temp = super().process(file_path)
+        temp.drop(["source",
+                   "score",
+                   "phase",
+                   "attributes_name",
+                   "attributes_alias",
+                   "attributes_parent",
+                   "attributes_target",
+                   "attributes_gap",
+                   "attributes_derives_from",
+                   "attributes_note",
+                   "attributes_dbxref",
+                   "attributes_ontology_term"], 
+                   axis=1, 
+                   inplace=True)
+        
+        temp = temp[["seqid", "attributes_id", "type", "start", "end", "strand"]]
+        temp.sort_values(by=["seqid", "attributes_id", "type"],
+                         inplace=True)
+        temp.set_index(["seqid", "attributes_id", "type"],
+                       inplace=True)
+        return temp

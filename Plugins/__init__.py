@@ -1,4 +1,4 @@
-#__init.py__
+#Plugins/__init.py__
 
 from Plugins.__caller__ import Caller, UnknownCallerModeError, CallerFailedVerification
 
